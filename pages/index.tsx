@@ -4,6 +4,8 @@ import Navbar from '../components/Navbar';
 import TodoForm from '../components/TodoForm';
 import TodoList from '../components/TodoList';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 
 const Home = ({ todos }: any) => {
   const parsedTodos = JSON.parse(todos);
@@ -24,14 +26,21 @@ const Home = ({ todos }: any) => {
 };
 
 export const getServerSideProps: GetServerSideProps = async () => {
-  const prisma = new PrismaClient();
+  const connectionString = process.env.DATABASE_URL;
+  const pool = new Pool({ connectionString });
+  const adapter = new PrismaPg(pool);
+  const prisma = new PrismaClient({ adapter });
 
-  const data = await prisma.todo.findMany();
-
-  if (!data) {
-    return { props: { message: 'Nothing to show' } };
+  try {
+    const data = await prisma.todo.findMany();
+    return { props: { todos: JSON.stringify(data || []) } };
+  } catch (error) {
+    console.error("DATABASE ERROR:", error);
+    return { props: { todos: JSON.stringify([]) } };
+  } finally {
+    await prisma.$disconnect();
   }
-  return { props: { todos: JSON.stringify(data) } };
 };
+
 
 export default Home;
